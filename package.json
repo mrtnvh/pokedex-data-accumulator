@@ -1,0 +1,15 @@
+{
+  "name": "image-scraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "p-each-series": "^2.1.0",
+    "playwright": "^0.12.1"
+  }
+}
