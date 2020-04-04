@@ -9,7 +9,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@tensorflow/tfjs": "^1.7.1",
+    "@tensorflow/tfjs-node": "^1.7.1",
+    "argparse": "^1.0.10",
+    "lodash": "^4.17.15",
     "p-each-series": "^2.1.0",
-    "playwright": "^0.12.1"
+    "p-reduce": "^2.1.0",
+    "puppeteer": "^2.1.1"
   }
 }

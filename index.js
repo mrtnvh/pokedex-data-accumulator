@@ -1,50 +1,68 @@
 const pEachSeries = require("p-each-series");
 const fs = require("fs");
-const playwright = require("playwright");
+const path = require("path");
+const puppeteer = require("puppeteer");
 const pokemon = require("./pokemon.json");
+const { DATA_DIR, DATA_LIMIT, HEADER } = require("./constants");
 
-const getImageSources = async (page, pokemonName) => {
+// Duck duck go
+// const getUrl = query =>
+//   `https://duckduckgo.com/?q=${quer}&t=h_&ia=images&iax=images`;
+// const imageSelector = ".tile"
+
+// Google
+const getUrl = query => `https://www.google.com/search?q=${query}&tbm=isch`;
+const imageSelector = "#islmp img";
+
+const createDirIfMissing = dirName => {
+  if (!fs.existsSync(dirName)) fs.mkdirSync(dirName);
+};
+
+const getAndSaveImages = async (page, pokemonName) => {
   try {
-    await page.goto(
-      `https://duckduckgo.com/?q=${pokemonName}&t=h_&ia=images&iax=images`
-    );
+    await page.goto(getUrl(pokemonName));
 
-    const images = await page.$$(".tile");
-    console.debug("Saving images for", pokemonName);
-    await Promise.all(
-      images.map(async (img, index) => {
-        const type = "jpeg";
+    const type = "jpeg";
+    const basePath = path.join(DATA_DIR, pokemonName);
+    const images = await page.$$(imageSelector);
+
+    createDirIfMissing(basePath);
+
+    if (images.length > 0) {
+      console.debug(
+        "--------------------------------------------------",
+        `\nSaving ${images.length} images for`,
+        pokemonName,
+      );
+      await pEachSeries(images, async (img, index) => {
         const fileName = `${index}.${type}`;
-        const basePath = `${__dirname}/results/${pokemonName}`;
         const path = `${basePath}/${fileName}`;
-
-        if (!fs.existsSync(basePath)) {
-          fs.mkdirSync(basePath);
-        }
 
         await img.screenshot({
           path,
           type
         });
-        console.debug(
-          "Done saving image",
-          pokemonName,
-          index,
-          "\n",
-          "-------------------------"
-        );
-      })
-    );
+        console.debug("Saved", pokemonName, index);
+      });
+    } else {
+      console.warn("No images found for", pokemonName);
+      await page.screenshot({ path: `${basePath}/page_screen.png` });
+    }
   } catch (error) {
     Promise.reject(error);
   }
 };
 
 (async () => {
-  const browser = await playwright.chromium.launch();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await pEachSeries(pokemon, pkmn => getImageSources(page, pkmn)).catch(e => {
+  createDirIfMissing(DATA_DIR);
+  const browser = await puppeteer.launch({
+    defaultViewport: {
+      width: 1440,
+      height: 900
+    }
+  });
+  const page = await browser.newPage();
+  await pEachSeries(pokemon, pkmn => getAndSaveImages(page, pkmn)).catch(e => {
     throw Error(e);
   });
   await browser.close();
