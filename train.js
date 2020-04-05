@@ -5,7 +5,7 @@ const fs = require("fs").promises;
 const path = require("path");
 const pReduce = require("p-reduce");
 const _ = require("lodash");
-const { DATA_DIR, DATA_LIMIT, HEADER } = require("./constants");
+const { DATA_DIR, DATA_LIMIT, HEADER, FILE_LIMIT } = require("./constants");
 
 const toTitleCase = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
@@ -22,7 +22,8 @@ const getData = () =>
           class: pkmn,
           path: `${dir}/${imageFile}`,
           label: pkmn,
-        }));
+        }))
+        .slice(0, FILE_LIMIT);
     })
   ).then((data) => data.flat());
 
@@ -78,34 +79,35 @@ const buildPretrainedModel = async () => {
 };
 
 const loadImages = (imagePaths, labels, pretrainedModel) =>
-  pReduce(imagePaths, async (data, path, index) => {
-    console.clear();
-    console.log(HEADER.join("\n"));
-    console.log("Current Pokémon:", toTitleCase(labels[index]));
-    console.log("Load image", index + 1, "of", imagePaths.length);
-    const loadedImage = await loadImage(path);
+  pReduce(
+    imagePaths,
+    async (data, path, index) => {
+      console.clear();
+      console.log(HEADER.join("\n"));
+      console.log("Current Pokémon:", toTitleCase(labels[index]));
+      console.log("Load image", index + 1, "of", imagePaths.length);
+      const loadedImage = await loadImage(path);
 
-    return tf.tidy(() => {
-      const croppedImage = cropImage(loadedImage);
-      const resizedImage = resizeImage(croppedImage);
-      const batchedImage = batchImage(resizedImage);
-      const prediction = pretrainedModel.predict(batchedImage);
+      return tf.tidy(() => {
+        const croppedImage = cropImage(loadedImage);
+        const resizedImage = resizeImage(croppedImage);
+        const batchedImage = batchImage(resizedImage);
+        const prediction = pretrainedModel.predict(batchedImage);
 
-      if (data) {
-        const newData = data.concat(prediction);
-        data.dispose();
-        return newData;
-      }
+        if (data) {
+          const newData = data.concat(prediction);
+          data.dispose();
+          return newData;
+        }
 
-      return tf.keep(prediction);
-    });
-  });
-
-const oneHot = (labelIndex, classLength) => {
-  return tf.tidy(() =>
-    tf.oneHot(tf.tensor1d([labelIndex]).toInt(), classLength)
+        return tf.keep(prediction);
+      });
+    },
+    undefined
   );
-};
+
+const oneHot = (labelIndex, classLength) =>
+  tf.tidy(() => tf.oneHot(tf.tensor1d([labelIndex]).toInt(), classLength));
 
 const getLabelsAsObject = (labels) => {
   let labelObject = {};
@@ -120,25 +122,18 @@ const getLabelsAsObject = (labels) => {
   return labelObject;
 };
 
-const addLabels = (labels) => {
-  return tf.tidy(() => {
-    const classes = getLabelsAsObject(labels); // _.uniq(labels);
+const addLabels = (labels) =>
+  tf.tidy(() => {
+    const classes = getLabelsAsObject(labels);
     const numberOfClasses = Object.keys(classes).length;
 
-    let ys;
-    for (let i = 0; i < labels.length; i++) {
-      const label = labels[i];
+    const ys = labels.reduce((acc, label, index) => {
       const labelIndex = classes[label];
       const y = oneHot(labelIndex, numberOfClasses);
-      if (i === 0) {
-        ys = y;
-      } else {
-        ys = ys.concat(y, 0);
-      }
-    }
+      return index === 0 ? y : acc.concat(y, 0);
+    }, undefined);
     return { ys, numberOfClasses };
   });
-};
 
 const getModel = (numberOfClasses) => {
   const model = tf.sequential({
@@ -203,6 +198,7 @@ const makePrediction = (pretrainedModel, model, image, expectedLabel) =>
 
   console.log("Add labels");
   const { numberOfClasses, ys } = addLabels(labels);
+  console.log(numberOfClasses);
 
   console.log("Get model");
   const model = getModel(numberOfClasses);

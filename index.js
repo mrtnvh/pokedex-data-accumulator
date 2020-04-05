@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
 const pokemon = require("./pokemon.json");
-const { DATA_DIR, DATA_LIMIT, HEADER } = require("./constants");
+const { DATA_DIR, HEADER } = require("./constants");
 
 // Duck duck go
 // const getUrl = query =>

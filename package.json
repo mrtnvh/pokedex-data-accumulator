@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "accumulate": "node index.js",
+    "train": "node train.js"
   },
   "author": "",
   "license": "ISC",
