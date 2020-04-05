@@ -1,6 +1,7 @@
 const path = require("path");
 
 const DATA_DIR = path.join(process.cwd(), "data");
+const MODEL_DIR = path.join(process.cwd(), "dist");
 const DATA_LIMIT = Infinity;
 
 // Add labels hoggs a lot of memory
@@ -16,4 +17,5 @@ module.exports = {
   DATA_LIMIT,
   HEADER,
   FILE_LIMIT,
+  MODEL_DIR,
 };

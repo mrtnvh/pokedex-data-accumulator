@@ -6,6 +6,7 @@ const path = require("path");
 const pReduce = require("p-reduce");
 const _ = require("lodash");
 const { DATA_DIR, DATA_LIMIT, HEADER, FILE_LIMIT } = require("./constants");
+const image = require("./lib/image");
 
 const toTitleCase = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
@@ -27,45 +28,6 @@ const getData = () =>
     })
   ).then((data) => data.flat());
 
-const resizeImage = (image) => tf.image.resizeBilinear(image, [224, 224]);
-
-const batchImage = (image) => {
-  // Expand our tensor to have an additional dimension, whose size is 1
-  const batchedImage = image.expandDims(0);
-
-  // Turn pixel data into a float between -1 and 1.
-  return batchedImage.toFloat().div(tf.scalar(127)).sub(tf.scalar(1));
-};
-
-const cropImage = (img) => {
-  const width = img.shape[0];
-  const height = img.shape[1];
-
-  // use the shorter side as the size to which we will crop
-  const shorterSide = Math.min(img.shape[0], img.shape[1]);
-
-  // calculate beginning and ending crop points
-  const startingHeight = (height - shorterSide) / 2;
-  const startingWidth = (width - shorterSide) / 2;
-  const endingHeight = startingHeight + shorterSide;
-  const endingWidth = startingWidth + shorterSide;
-
-  // return image data cropped to those points
-  return img.slice(
-    [startingWidth, startingHeight, 0],
-    [endingWidth, endingHeight, 3]
-  );
-};
-
-const loadImage = async (src) => {
-  try {
-    const buffer = await fs.readFile(src);
-    return tfnode.node.decodeImage(buffer);
-  } catch (error) {
-    throw Error(src, error);
-  }
-};
-
 const buildPretrainedModel = async () => {
   const mobilenet = await tf.loadLayersModel(
     "https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json"
@@ -86,12 +48,12 @@ const loadImages = (imagePaths, labels, pretrainedModel) =>
       console.log(HEADER.join("\n"));
       console.log("Current Pokémon:", toTitleCase(labels[index]));
       console.log("Load image", index + 1, "of", imagePaths.length);
-      const loadedImage = await loadImage(path);
+      const loadedImage = await image.loadSingle(path);
 
       return tf.tidy(() => {
-        const croppedImage = cropImage(loadedImage);
-        const resizedImage = resizeImage(croppedImage);
-        const batchedImage = batchImage(resizedImage);
+        const croppedImage = image.crop(loadedImage);
+        const resizedImage = image.resize(croppedImage);
+        const batchedImage = image.batch(resizedImage);
         const prediction = pretrainedModel.predict(batchedImage);
 
         if (data) {
@@ -163,27 +125,6 @@ const getModel = (numberOfClasses) => {
   return model;
 };
 
-const makePrediction = (pretrainedModel, model, image, expectedLabel) =>
-  loadImage(image)
-    .then((loadedImage) => {
-      return loadAndProcessImage(loadedImage);
-    })
-    .then((loadedImage) => {
-      const activatedImage = pretrainedModel.predict(loadedImage);
-      loadedImage.dispose();
-      return activatedImage;
-    })
-    .then((activatedImage) => {
-      const prediction = model.predict(activatedImage);
-      const predictionLabel = prediction.as1D().argMax().dataSync()[0];
-
-      console.log("Expected Label", expectedLabel);
-      console.log("Predicted Label", predictionLabel);
-
-      prediction.dispose();
-      activatedImage.dispose();
-    });
-
 (async () => {
   console.clear();
   console.log(HEADER.join("\n"));
@@ -214,8 +155,4 @@ const makePrediction = (pretrainedModel, model, image, expectedLabel) =>
   await model.save(`file:///${outDir}`);
 
   console.log("Training complete");
-
-  // make predictions
-  // makePrediction(pretrainedModel, model, blue3, "0");
-  // makePrediction(pretrainedModel, model, red3, "1");
 })();

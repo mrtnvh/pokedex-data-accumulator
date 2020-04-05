@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "accumulate": "node index.js",
-    "train": "node train.js"
+    "train": "node train.js",
+    "predict": "node predict.js"
   },
   "author": "",
   "license": "ISC",
